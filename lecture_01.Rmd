@@ -1,0 +1,352 @@
+---
+title: "Lecture 1"
+output: html_notebook
+author: Bob Stine
+date: 27 Jun 2024
+---
+
+Contents:
+
+    * Basic R commands
+    * Examples of time series plots using astsa
+    
+Before running the following commands, become familiar with the different panes within the R-Studio window.
+
+Next, use the Package pane to install the `astsa` package. We will use this package throughout the course.
+
+Once other packages are installed that support output formatting (the software will bug you about this), R-Studio will create an html version of your R notebook and save the file adjacent to the notebook file (identified by the .Rmd filename suffix).  I seldom use these, but they can be helpful for sharing what you've done with someone that doesn't have R/R-Studio.
+
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+# Basic R commands
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+You can use R as a powerful calculator with many built-in functions.  
+
+You can put multiple commands within the same input block for evaluation. R-Studio button/keyed commands let you evaluate one line or the entire block. The output of running a line (or "chunk" of several lines or commands) appears below.
+
+```{r}
+4 + 5
+
+log(34)  # natural log (this is a comment)
+```
+
+Vectors (sequences) and assignment, with error messages and NaN/Infinity detection.
+
+```{r}
+x <- c(-1,0,1,2,3,4,5)   # assignment (you can use =, but I won't)
+x
+x + 3
+log(x)
+```
+
+Indexing
+
+```{r}
+length(x)
+
+x[0]   # R is 1-based indexing
+x[1]
+x[3]
+
+x[45]
+```
+
+Matrices are a fundamental data type in R.  Matrices are constructed in a variety of ways, but most directly with the `matrix` function.
+
+```{r}
+m <- matrix(1:6, nrow=3, ncol=2)
+m
+```
+
+```{r}
+dim(m)
+```
+
+Another way to create a matrix is with the function `cbind`.
+
+```{r}
+cbind(1:3, 4:6)
+```
+
+Data frames are rectangular objects that allow different data types, such as text and numbers.
+
+```{r}
+data.frame(letter=c('a', 'b', 'c', 'd'), index=1:4)
+```
+
+
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+# Random numbers, stats, plots
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+Random numbers, sequences, plots.
+
+```{r}
+set.seed(234)   # to replicate pseudo-random examples
+
+n <- 50     
+x <- 1:n        # watch out Python users
+y <- rnorm(n)
+
+plot(x,y)       # standard R scatter plot
+```
+
+Random walk
+
+```{r}
+w <- cumsum(y)
+x[1:2]
+w[1:2]
+plot(x,w)
+```
+
+"Fancier" version.
+
+```{r}
+par(mgp = c(2, 1, 0), mar = c(3, 3, 2, 1))       # what do you think this does; ?par to find out
+plot(x,w, xlab="Time", ylab=bquote(Random~Walk~W[t]), pch=4, col='dodgerblue')
+lines(x,w, col='lightgray', lwd=0.5)
+```
+
+Histograms and distributions.
+
+```{r}
+mean(w)
+sd(w)
+
+hist(w, probability = TRUE)
+lines(density(w), col=2, lwd=3)
+```
+
+Regression is built-in.
+
+```{r}
+summary(lm(w ~ x))    # should this be significant?
+```
+
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+# Time series in R
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+The random walk sequence `w` created above is simply a sequence.  R doesn't treat it special; `w` is a vector of numbers with no special attributes.
+
+```{r}
+typeof(w)
+
+attributes(w)
+```
+
+Time series objects in R have a time sequence attribute that influences the x-axis in plots in *some* functions.
+
+```{r}
+w.ts <- ts(w, start=2000)
+
+typeof(w.ts)
+attributes(w.ts)
+```
+
+The built-in function `plot` uses the ts attribute to determine the x-axis.  
+
+```{r}
+plot(w.ts)
+```
+
+Attributes are important for aligning time series when lagging, shifting a time series foreward or backward in time.  For example, one might want to fit a simple autoregression of the form
+$$ \hat{w}_t = \hat\alpha + \hat\beta\,w_{t-1} $$
+
+```{r}
+w.ts[1:2]      # index as a sequence, not by the underlying ts indices shown in plot!
+
+lag(w.ts,1)    # changes the underlying time series attribute
+```
+
+```{r}
+lm(w.ts ~ lag(w.ts))    # not what we want!  What happened???
+```
+
+WARNING: Many functions in R don't pay attention to the time series attribute.  Fortunately, `cbind` does. Or, you can use `ts.intersect` to keep just the complete cases.
+
+```{r}
+head(  cbind(w=w.ts, lag_w=lag(w.ts))    )   # adding column names is optional, but useful
+```
+```{r}
+head(   ts.intersect(w=w.ts, lag_w=lag(w.ts))    )
+```
+
+Now we can get the correct estimated autoregression.
+
+```{r}
+rwData = ts.intersect(w=w.ts, lag_w=lag(w.ts))     # why are there only 47 d.f?
+summary(lm(w ~ lag_w, data=rwData))
+```
+
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+# ASTSA package
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+Need to load the package into the R environment first. (You have to install the package first.)
+
+```{r}
+library(astsa)
+```
+
+The astsa package includes the function `tsplot` which makes nicer figures.
+
+```{r}
+?tsplot # or type the name into the help panel
+```
+
+```{r}
+tsplot(w.ts)
+```
+
+ggplot is a popular alternative, albeit at the cost of learning a different approach to setting options. It has another weakness too: ggplot doesn't respect time series objects (too bad).
+
+```{r}
+library(ggplot2)
+```
+
+```{r}
+df <- data.frame(time=1:length(w), w = w)
+ggplot(df, aes(x=time, y=w)) + geom_line()
+```
+
+## Example 1.1   J&J earnings per share
+
+The time series `jj` is included in the astsa package.
+
+```{r}
+?jj                # get an error if you don't have astsa loaded
+
+attributes(jj)     # how can you tell it is quarterly data
+```
+
+```{r}
+tsplot(jj)
+```
+
+```{r}
+tsplot(log10(jj))
+```
+
+Why switch to natural logs?
+
+```{r}
+tsplot(log(jj), main="J&J Quarterly Earnings", ylab="Log Earnings")
+abline( lm(log(jj) ~ time(jj)), col='red')
+```
+
+What's the interpretation of the fitted line?
+
+```{r}
+coefficients( lm(log(jj) ~ time(jj)) )
+```
+Darn...  The option to use a log scale with untransformed units on the y-axis doesn't play well with the added line.
+
+```{r}
+tsplot(jj, main="J&J Quarterly Earnings", ylab="Earnings", log='y')
+abline( lm(log(jj) ~ time(jj)), col='red')
+```
+
+
+## Example 1.2   Global warming
+
+Both series are temperature anomalies.
+
+```{r}
+?gtemp_ocean
+?gtemp_land
+```
+
+Plot together or overlaid  The first plot shown determines the axes limits.
+
+```{r}
+layout(matrix(c(1,2,3,3), nrow=2, byrow=TRUE))
+
+tsplot(gtemp_ocean, col='blue', ylab="Ocean Temp Dev")
+tsplot(gtemp_land, col='brown', ylab="Land Temp Dev")
+
+tsplot(gtemp_ocean, col='blue', ylab="Temp Deviation")  
+lines(gtemp_land, col='brown')   # add lines to an existing plot
+```
+
+Cleaned up a bit with a legend in the plot.
+
+```{r}
+tsplot(gtemp_ocean, col='blue', ylim=c(-.8, 1.5), lwd=2)
+lines(gtemp_land, col='brown')
+legend('topleft', legend=c("Ocean", "Land"), lwd=2:1, col=c('blue', 'brown'))
+```
+
+
+## Example 1.6   fMRI
+
+Response to input electrical signal.
+
+```{r}
+?fmri1
+```
+
+```{r}
+attributes(fmri1)
+```
+
+```{r}
+head(fmri1)
+```
+
+```{r}
+dim(fmri1)
+```
+
+Create a vector for the stimulus signal to show in the plot.
+
+```{r}
+rep(1,4)
+
+rep(1:3,2)
+```
+
+```{r}
+signal <- rep( c(rep(0.6,16), rep(-0.6,16)), 4)
+length(signal)
+```
+
+Clear response in the cortex. Less clear elsewhere. 
+
+```{r}
+nn <- colnames(fmri1)
+j <- 4
+tsplot(fmri1[,j  ], main=nn[j], ylim=c(-0.6,0.6), ylab="BOLD")
+lines( fmri1[,j+1], col=4)
+lines(signal, type='s', col=2)
+```
+
+Not so clear here.  We'll have a better way to detect this signal later in the course.
+
+```{r}
+j <- 6
+tsplot(fmri1[,j  ], main=nn[j], ylim=c(-0.6,0.6))
+lines( fmri1[,j+1], col=4)
+lines(signal, type='s', col=2)
+```
+
+```{r}
+j <- 8
+tsplot(fmri1[,j  ], main=nn[j], ylim=c(-0.6,0.6))
+lines( fmri1[,j+1], col=4)
+lines(signal, type='s', col=2)
+```
+
